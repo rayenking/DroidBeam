@@ -14,7 +14,7 @@ class BootReceiver : BroadcastReceiver() {
             "com.htc.intent.action.QUICKBOOT_POWERON" -> {
                 val prefs = Prefs(context)
                 if (!prefs.enabled || !prefs.isRegistered) return
-                GatewayState.log("Menyalakan gateway setelah ${if (intent.action == Intent.ACTION_MY_PACKAGE_REPLACED) "update app" else "HP dinyalakan"}")
+                GatewayState.log("Starting gateway after ${if (intent.action == Intent.ACTION_MY_PACKAGE_REPLACED) "app update" else "boot"}")
                 WatchdogWorker.schedule(context)
                 GatewayService.ensureRunning(context)
             }

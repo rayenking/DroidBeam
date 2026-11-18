@@ -138,7 +138,7 @@ class ApiClient(
             if (candidate == primaryUrl) continue
             if (probe(candidate, info.serverId)) {
                 discover(candidate, info.serverId)
-                GatewayState.log("IP LAN server ditemukan lewat domain: $candidate")
+                GatewayState.log("Server LAN address found via domain: $candidate")
                 switchTo(0)
                 return
             }
@@ -172,7 +172,7 @@ class ApiClient(
                 lastError = e
             }
         }
-        throw lastError ?: IOException("Alamat server belum diisi")
+        throw lastError ?: IOException("Server address not set")
     }
 
     private fun switchTo(i: Int) {
@@ -180,7 +180,7 @@ class ApiClient(
         activeIndex = i
         if (i != 0) lastPrimaryProbe = System.currentTimeMillis()
         GatewayState.setEndpoint(endpointLabel(i), slot(i))
-        if (changed) GatewayState.log("Beralih ke alamat ${endpointLabel(i)}: ${slot(i)}")
+        if (changed) GatewayState.log("Switched to ${endpointLabel(i)} address: ${slot(i)}")
     }
 
     private fun device(url: String): Request.Builder {

@@ -24,13 +24,13 @@ class SmsStatusReceiver : BroadcastReceiver() {
                     PartTracker.Outcome.OK -> {
                         ReportWorker.enqueueStatus(context, id, "sent", sim = sim)
                         GatewayState.countSent()
-                        GatewayState.log("#$id terkirim$simLabel")
+                        GatewayState.log("#$id sent$simLabel")
                     }
                     PartTracker.Outcome.FAILED -> {
                         val reason = sendErrorName(resultCode)
                         ReportWorker.enqueueStatus(context, id, "failed", reason, sim)
                         GatewayState.countFailed()
-                        GatewayState.log("#$id gagal$simLabel: $reason")
+                        GatewayState.log("#$id failed$simLabel: $reason")
                     }
                     else -> Unit
                 }
@@ -40,11 +40,11 @@ class SmsStatusReceiver : BroadcastReceiver() {
                 when (PartTracker.onDelivered(id, ok)) {
                     PartTracker.Outcome.OK -> {
                         ReportWorker.enqueueStatus(context, id, "delivered", sim = sim)
-                        GatewayState.log("#$id diterima penerima")
+                        GatewayState.log("#$id delivered")
                     }
                     PartTracker.Outcome.FAILED -> {
                         ReportWorker.enqueueStatus(context, id, "failed", "delivery failed", sim)
-                        GatewayState.log("#$id gagal sampai ke penerima")
+                        GatewayState.log("#$id delivery failed")
                     }
                     else -> Unit
                 }

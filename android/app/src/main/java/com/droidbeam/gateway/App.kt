@@ -11,7 +11,7 @@ class App : Application() {
             CHANNEL_GATEWAY,
             "Status gateway",
             NotificationManager.IMPORTANCE_LOW,
-        ).apply { description = "Notifikasi tetap saat gateway SMS berjalan" }
+        ).apply { description = "Persistent notification while the SMS gateway is running" }
         getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
     }
 

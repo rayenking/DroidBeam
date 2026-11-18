@@ -1,20 +1,31 @@
-# DroidBeam — SMS Gateway Android
+# DroidBeam — Android SMS Gateway
 
-Ubah HP Android jadi SMS gateway. Aplikasimu cukup memanggil REST API server, lalu server meneruskan pesan ke HP yang mengirim SMS lewat SIM-nya. SMS yang masuk ke HP juga diteruskan balik ke server lewat webhook.
+Turn an Android phone into an SMS gateway. Your application calls the server's REST API, the server hands the message to the phone, and the phone sends it through its SIM. Incoming SMS on the phone are forwarded back to the server and delivered to you via webhook.
 
 ```
-Aplikasi kamu ──REST──▶ Server Go ◀──long-poll── HP Android (DroidBeam) ──SMS──▶ penerima
-                          │   ▲                       │
-                 webhook ◀┘   └── status / SMS masuk / baterai / info device
+Your app ──REST──▶ Go server ◀──long-poll── Android phone (DroidBeam) ──SMS──▶ recipient
+                     │   ▲                       │
+            webhook ◀┘   └── status / incoming SMS / battery / device info
 ```
 
-- `server/`: server Go dengan SQLite (satu binary, tanpa dependensi C).
-- `android/`: app Kotlin + Jetpack Compose (minSdk 26 / Android 8.0).
-- `scripts/get-lan-ip.sh`: ambil IP LAN server lewat domain publik.
+- `server/`: Go server with SQLite (single binary, no C dependencies).
+- `android/`: Kotlin + Jetpack Compose app (minSdk 26 / Android 8.0).
+- `scripts/get-lan-ip.sh`: look up the server's LAN address via its public domain.
+
+**Downloads:** the Android APK and prebuilt server binaries (Linux, macOS, Windows) are on the [Releases](https://github.com/rayenking/DroidBeam/releases/latest) page.
 
 ---
 
-## 1. Menjalankan server
+## 1. Running the server
+
+Use a prebuilt binary from [Releases](https://github.com/rayenking/DroidBeam/releases/latest):
+
+```bash
+tar xzf droidbeam-server_*_linux_amd64.tar.gz
+DROIDBEAM_API_KEY=$(openssl rand -hex 24) ./droidbeam-server
+```
+
+Or build from source (Go 1.26+):
 
 ```bash
 cd server
@@ -22,104 +33,104 @@ go build -o droidbeam-server .
 DROIDBEAM_API_KEY=$(openssl rand -hex 24) ./droidbeam-server
 ```
 
-Simpan API key itu. Key ini dipakai aplikasimu dan saat mendaftarkan HP.
+Keep that API key: your application uses it, and so does the phone when you register it.
 
-| Variabel | Default | Keterangan |
+| Variable | Default | Description |
 |---|---|---|
-| `DROIDBEAM_API_KEY` | (wajib) | Rahasia minimal 16 karakter |
-| `DROIDBEAM_ADDR` | `:8080` | Alamat listen |
-| `DROIDBEAM_DB` | `droidbeam.db` | File SQLite |
-| `DROIDBEAM_WEBHOOK_URL` | – | URL tujuan semua event webhook |
-| `DROIDBEAM_WEBHOOK_SECRET` | – | Kalau diisi, body ditandatangani HMAC-SHA256 |
-| `DROIDBEAM_BATTERY_THRESHOLDS` | `20,80` | Level baterai (%) yang memicu webhook saat dilewati |
-| `DROIDBEAM_LAN_URL` | (deteksi otomatis) | Alamat LAN yang diumumkan ke HP/script, mis. `http://192.168.1.10:8080`. Wajib diisi kalau server jalan di Docker |
-| `DROIDBEAM_OFFLINE_AFTER` | `2m` | HP dianggap offline kalau tidak menghubungi server selama ini |
-| `DROIDBEAM_SEND_TIMEOUT` | `10m` | Pesan yang diambil HP tapi tidak dilaporkan hasilnya ditandai `failed` |
+| `DROIDBEAM_API_KEY` | (required) | Secret, at least 16 characters |
+| `DROIDBEAM_ADDR` | `:8080` | Listen address |
+| `DROIDBEAM_DB` | `droidbeam.db` | SQLite file |
+| `DROIDBEAM_WEBHOOK_URL` | – | URL that receives all webhook events |
+| `DROIDBEAM_WEBHOOK_SECRET` | – | If set, webhook bodies are signed with HMAC-SHA256 |
+| `DROIDBEAM_BATTERY_THRESHOLDS` | `20,80` | Battery levels (%) that trigger a webhook when crossed |
+| `DROIDBEAM_LAN_URL` | (auto-detected) | LAN address advertised to phones and scripts, e.g. `http://192.168.1.10:8080`. Required when running in Docker |
+| `DROIDBEAM_OFFLINE_AFTER` | `2m` | A phone is considered offline after this long without contacting the server |
+| `DROIDBEAM_SEND_TIMEOUT` | `10m` | Messages picked up by a phone but never reported back are marked `failed` |
 
 ### Docker
 
 ```bash
-cp .env.example .env      # isi DROIDBEAM_API_KEY dan DROIDBEAM_LAN_URL
+cp .env.example .env      # fill in DROIDBEAM_API_KEY and DROIDBEAM_LAN_URL
 docker compose up -d
 docker compose logs -f
 ```
 
-- Image-nya kecil (±13 MB): binary Go statis di atas `distroless`, berjalan sebagai user non-root.
-- Database disimpan di volume `droidbeam-data` (`/data/droidbeam.db`), jadi tidak hilang saat container dibuat ulang.
-- **Isi `DROIDBEAM_LAN_URL`** dengan IP LAN host Docker, misalnya `http://192.168.1.10:8080`. Dari dalam container, server tidak bisa melihat IP LAN host.
-- Container punya healthcheck ke `/healthz` dan otomatis restart (`restart: unless-stopped`).
-- Zona waktu default `Asia/Jakarta`. Zona ini dipakai untuk hitungan "hari ini" di dashboard; ubah lewat `TZ`.
+- Small image (~13 MB): a static Go binary on `distroless`, running as a non-root user.
+- The database lives in the `droidbeam-data` volume (`/data/droidbeam.db`), so it survives container re-creation.
+- **Set `DROIDBEAM_LAN_URL`** to the Docker host's LAN address, e.g. `http://192.168.1.10:8080`. From inside the container the server cannot see the host's LAN IP.
+- The container has a healthcheck on `/healthz` and restarts automatically (`restart: unless-stopped`).
+- Time zone defaults to `Asia/Jakarta`; it decides what "today" means on the dashboard. Change it with `TZ`.
 
-Tanpa compose:
+Without compose:
 ```bash
 docker build -t droidbeam-server ./server
 docker run -d --name droidbeam -p 8080:8080 -v droidbeam-data:/data \
   -e DROIDBEAM_API_KEY=... -e DROIDBEAM_LAN_URL=http://192.168.1.10:8080 droidbeam-server
 ```
 
-### LAN + domain publik (satu server, dua alamat)
+### LAN + public domain (one server, two addresses)
 
-Jalankan server di jaringan lokal, lalu ekspos ke internet lewat domain, misalnya dengan Cloudflare Tunnel, reverse proxy di VPS, atau port forwarding + HTTPS. Hasilnya, server yang sama bisa diakses lewat:
+Run the server on your local network, then expose it to the internet through a domain, e.g. with Cloudflare Tunnel, a reverse proxy on a VPS, or port forwarding + HTTPS. The same server is then reachable at:
 
-- **LAN**: `http://192.168.1.10:8080` (cepat, tetap jalan walau internet putus)
-- **Publik**: `https://sms.domainmu.com`
+- **LAN**: `http://192.168.1.10:8080` (fast, keeps working when the internet is down)
+- **Public**: `https://sms.example.com`
 
-Saat start, server mencetak alamat LAN yang terdeteksi:
+On startup the server prints the LAN addresses it detected:
 ```
 LAN address(es) advertised to devices: [http://192.168.1.10:8080]
 ```
 
-> Gunakan **HTTPS** untuk alamat publik. HTTP polos hanya untuk LAN.
+> Use **HTTPS** for the public address. Plain HTTP is for the LAN only.
 
-### Dashboard web
+### Web dashboard
 
-Buka `http://<server>:8080/` di browser, lalu masuk dengan API key. Dashboard ikut tertanam di binary server, tanpa CDN atau internet, jadi tetap jalan di LAN. Isinya:
+Open `http://<server>:8080/` in a browser and sign in with the API key. The dashboard is embedded in the server binary and loads nothing from the internet, so it works on an offline LAN. It shows:
 
-- **Ringkasan hari ini**: perangkat online, pesan terkirim, pesan gagal, dan SMS masuk.
-- **Kartu perangkat**: status online/offline, baterai (level, mengisi, suhu), status sinyal tiap SIM, jalur (LAN/cloud), IP, dan waktu terakhir terlihat.
-- **Form kirim SMS**: perkiraan jumlah SMS, plus pilihan perangkat dan SIM.
-- **Daftar pesan keluar** dengan filter status, dan **daftar SMS masuk**.
-- Diperbarui otomatis tiap 5 detik (dijeda saat tab tidak aktif).
+- **Today's summary**: devices online, messages sent, messages failed, incoming SMS.
+- **Device cards**: online/offline, battery (level, charging, temperature), signal per SIM, route (LAN/cloud), IP and last seen.
+- **Send SMS form** with an SMS segment estimate and device/SIM selection.
+- **Outgoing messages** with a status filter, and **incoming SMS**.
+- Auto-refresh every 5 seconds (paused while the tab is hidden).
 
-API key hanya disimpan di browser (sessionStorage, atau localStorage kalau "Ingat di browser ini" dicentang). Jangan buka dashboard lewat HTTP polos dari internet; gunakan HTTPS untuk alamat publik.
+The API key is stored only in the browser (sessionStorage, or localStorage if "Remember on this browser" is checked). Do not open the dashboard over plain HTTP from the internet; use HTTPS for the public address.
 
 ---
 
-## 2. Memasang app Android
+## 2. Installing the Android app
 
-**Cara termudah:** unduh APK dari halaman [Releases](https://github.com/rayenking/DroidBeam/releases/latest), lalu pasang di HP (izinkan "instal dari sumber tidak dikenal").
+**Easiest:** download the APK from [Releases](https://github.com/rayenking/DroidBeam/releases/latest) and install it on the phone (allow "install unknown apps").
 
-Atau build sendiri:
+Or build it yourself:
 ```bash
 cd android
 ./gradlew assembleDebug
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-Bisa juga buka folder `android/` di Android Studio lalu Run.
+You can also open the `android/` folder in Android Studio and press Run.
 
-Di HP:
-1. **Hubungkan ke server**: isi *Alamat cloud / domain*, *API key*, dan nama perangkat. *Alamat LAN* boleh dikosongkan kalau "Cari IP LAN otomatis lewat domain" aktif. Lalu tekan **Daftarkan perangkat**.
-2. **Berikan izin** SMS dan notifikasi.
-3. **Kecualikan dari optimasi baterai**. Ini penting agar gateway tidak dimatikan sistem.
-4. Nyalakan switch **Gateway**.
+On the phone:
+1. **Connect to server**: enter the *Cloud / domain address*, the *Server API key* and a device name. The *LAN address* can stay empty when "Discover LAN address via domain" is on. Tap **Register device**.
+2. **Grant permissions** for SMS, SIM status and notifications.
+3. **Exempt from battery optimization**. This is important so the system doesn't kill the gateway.
+4. Turn on the **Gateway** switch.
 
-### Agar tetap hidup (background / foreground / startup)
+### Staying alive (background / foreground / boot)
 
-| Mekanisme | Fungsi |
+| Mechanism | Purpose |
 |---|---|
-| Foreground service (`remoteMessaging`) + notifikasi tetap | Tetap jalan saat app ditutup |
-| `START_STICKY` | Android menyalakan ulang service kalau dimatikan |
-| `BootReceiver` | Menyala otomatis setelah HP restart atau app di-update |
-| `WatchdogWorker` (WorkManager, tiap 15 menit + 30 detik setelah service mati) | Menghidupkan lagi kalau dibunuh task killer OEM |
-| Partial wake lock + Wi-Fi lock | Polling tetap jalan saat layar mati / Doze |
-| Network callback | Langsung reconnect begitu jaringan kembali |
-| Status & SMS masuk via WorkManager | Tidak hilang walau sedang offline; dikirim ulang otomatis |
-| Semua error di loop ditangkap | Satu respons aneh tidak membuat app crash |
+| Foreground service (`remoteMessaging`) + persistent notification | Keeps running when the app is closed |
+| `START_STICKY` | Android restarts the service if it is killed |
+| `BootReceiver` | Starts automatically after reboot or app update |
+| `WatchdogWorker` (WorkManager, every 15 min + 30 s after the service dies) | Revives the gateway if an OEM task killer stops it |
+| Partial wake lock + Wi-Fi lock | Polling continues with the screen off / in Doze |
+| Network callback | Reconnects immediately when the network comes back |
+| Status reports & incoming SMS via WorkManager | Nothing is lost while offline; retried automatically |
+| All loop errors are caught | One bad response cannot crash the app |
 
-**Khusus Xiaomi / Oppo / Vivo / Realme / Samsung**: aktifkan **Autostart** dan set baterai app ke **Tanpa batasan** (tombol *Buka pengaturan app*). Ini **wajib**. Tanpa Autostart, HyperOS/MIUI memblokir app menyala sendiri setelah HP restart atau app di-update (terlihat di logcat: `process is not permitted to auto start`). Untuk HP yang khusus dijadikan gateway, biarkan selalu terhubung ke charger.
+**Xiaomi / Oppo / Vivo / Realme / Samsung**: enable **Autostart** and set the app's battery mode to **No restrictions** (button *Open app settings*). This is **required**. Without Autostart, HyperOS/MIUI blocks the app from starting itself after a reboot or update (logcat shows `process is not permitted to auto start`). For a phone dedicated to being a gateway, keep it on a charger.
 
-**Batas SMS Android**: secara default Android meminta konfirmasi kalau satu app mengirim lebih dari ±30 SMS dalam 30 menit. Untuk HP gateway, naikkan batasnya lewat adb:
+**Android SMS limit**: by default Android asks for confirmation when one app sends more than ~30 SMS in 30 minutes. On a gateway phone, raise the limit with adb:
 ```bash
 adb shell settings put global sms_outgoing_check_max_count 10000
 ```
@@ -127,56 +138,56 @@ adb shell settings put global sms_outgoing_check_max_count 10000
 adb shell settings put global sms_outgoing_check_interval_ms 60000
 ```
 
-### Fallback LAN → cloud
+### LAN → cloud fallback
 
-- App memakai alamat **LAN** dulu. Kalau gagal tersambung, request otomatis diulang lewat **domain**.
-- Selama berada di cloud, app mengecek LAN tiap 60 detik (atau segera setelah jaringan berganti) dan kembali ke LAN kalau bisa.
-- Dengan *Cari IP LAN otomatis*, app menanyakan IP LAN server lewat domain (`/api/v1/device/server-info`), lalu memverifikasi lewat `server_id` bahwa alamat itu memang server yang sama. Jadi kalau IP LAN server berubah (DHCP), HP ikut menyesuaikan sendiri.
+- The app uses the **LAN** address first. If it can't connect, the request is retried via the **domain**.
+- While on cloud, the app checks the LAN every 60 seconds (or right after a network change) and switches back when it can.
+- With *Discover LAN address via domain*, the app asks the server for its LAN address via the domain (`/api/v1/device/server-info`) and verifies through `server_id` that the address really is the same server. If the server's LAN IP changes (DHCP), the phone follows automatically.
 
 ---
 
 ## 3. API
 
-Semua endpoint klien memakai header `X-API-Key: <API key>`.
+All client endpoints use the header `X-API-Key: <API key>`.
 
-### Kirim SMS
+### Send SMS
 ```bash
-curl -X POST https://sms.domainmu.com/api/v1/messages \
+curl -X POST https://sms.example.com/api/v1/messages \
   -H "X-API-Key: $KEY" -H "Content-Type: application/json" \
-  -d '{"to":"+6281234567890","body":"Halo dari DroidBeam"}'
+  -d '{"to":"+6281234567890","body":"Hello from DroidBeam"}'
 ```
-Field opsional:
-- `"device_id": 1`: paksa lewat HP tertentu.
-- `"sim": 2`: paksa lewat SIM 2. Kalau tidak diisi, app memakai SIM default SMS; kalau SIM itu **tanpa layanan**, app otomatis pindah ke SIM yang ada sinyal.
+Optional fields:
+- `"device_id": 1`: send through a specific phone.
+- `"sim": 2`: send through SIM 2. If omitted, the app uses the default SMS SIM; if that SIM has **no service**, it automatically switches to a SIM that does.
 
-Respons `202`:
+Response `202`:
 ```json
-{"id":1,"to":"+6281234567890","body":"Halo dari DroidBeam","status":"queued","device_id":null,"error":null,
+{"id":1,"to":"+6281234567890","body":"Hello from DroidBeam","status":"queued","device_id":null,"error":null,
  "created_at":"…","updated_at":"…","sent_at":null,"delivered_at":null,"sim":null,"sim_used":null}
 ```
-`sim_used` diisi HP dengan nomor slot SIM yang benar-benar dipakai.
-Status pesan: `queued` → `sending` → `sent` → `delivered`, atau `failed` (dengan `error`).
+`sim_used` is filled in by the phone with the SIM slot actually used.
+Message status: `queued` → `sending` → `sent` → `delivered`, or `failed` (with `error`).
 
-| Method | Path | Keterangan |
+| Method | Path | Description |
 |---|---|---|
-| `POST` | `/api/v1/messages` | Kirim SMS (maks 1600 karakter, otomatis dipecah multipart) |
-| `GET` | `/api/v1/messages/{id}` | Status satu pesan |
-| `GET` | `/api/v1/messages?status=&limit=&before=` | Daftar pesan (terbaru dulu) |
-| `GET` | `/api/v1/inbox?limit=&before=` | SMS masuk |
-| `GET` | `/api/v1/devices` | Semua HP, termasuk info dan baterai |
-| `GET` | `/api/v1/devices/{id}` | Info satu HP, termasuk baterai |
-| `POST` | `/api/v1/devices` | Daftarkan HP (biasanya dilakukan oleh app) |
-| `GET` | `/api/v1/server-info` | `server_id` + `lan_urls` (IP LAN server) |
-| `GET` | `/api/v1/stats` | Jumlah pesan per status (semua & hari ini) + SMS masuk hari ini |
-| `GET` | `/healthz` | Health check (tanpa auth) |
+| `POST` | `/api/v1/messages` | Send SMS (max 1600 characters, split into multipart automatically) |
+| `GET` | `/api/v1/messages/{id}` | Status of one message |
+| `GET` | `/api/v1/messages?status=&limit=&before=` | List messages (newest first) |
+| `GET` | `/api/v1/inbox?limit=&before=` | Incoming SMS |
+| `GET` | `/api/v1/devices` | All phones, including info and battery |
+| `GET` | `/api/v1/devices/{id}` | One phone, including battery |
+| `POST` | `/api/v1/devices` | Register a phone (normally done by the app) |
+| `GET` | `/api/v1/server-info` | `server_id` + `lan_urls` (server LAN addresses) |
+| `GET` | `/api/v1/stats` | Message counts per status (all time & today) + incoming SMS today |
+| `GET` | `/healthz` | Health check (no auth) |
 
-### Info device + baterai
+### Device info + battery
 ```bash
-curl -H "X-API-Key: $KEY" https://sms.domainmu.com/api/v1/devices/1
+curl -H "X-API-Key: $KEY" https://sms.example.com/api/v1/devices/1
 ```
 ```json
 {
-  "id": 1, "name": "HP Kantor", "online": true,
+  "id": 1, "name": "Office phone", "online": true,
   "created_at": "2026-11-18T11:27:21.845Z", "last_seen_at": "2026-11-18T11:30:02.112Z",
   "info": {
     "manufacturer": "Samsung", "model": "Galaxy A15", "android_version": "14", "sdk": 34,
@@ -193,54 +204,54 @@ curl -H "X-API-Key: $KEY" https://sms.domainmu.com/api/v1/devices/1
   }
 }
 ```
-- `info.connection`: `primary` (LAN) atau `fallback` (cloud).
-- `info.local_ip`: IP HP di jaringannya.
-- `info.sims`: SIM yang terpasang, apakah ada sinyal, dan mana yang default untuk SMS.
-- `battery.status`: `charging`, `discharging`, `full`, `not_charging`, atau `unknown`.
-- `battery.plugged`: `ac`, `usb`, `wireless`, `dock`, atau `none`.
+- `info.connection`: `primary` (LAN) or `fallback` (cloud).
+- `info.local_ip`: the phone's IP on its network.
+- `info.sims`: installed SIMs, whether each has service, and which is the default for SMS.
+- `battery.status`: `charging`, `discharging`, `full`, `not_charging` or `unknown`.
+- `battery.plugged`: `ac`, `usb`, `wireless`, `dock` or `none`.
 
-HP mengirim data ini setiap kali level atau status pengisian berubah, dan tiap 5 menit sebagai heartbeat.
+The phone sends this whenever the battery level or charging state changes, and every 5 minutes as a heartbeat.
 
-### Ambil IP LAN server lewat domain
+### Get the server's LAN address via the domain
 ```bash
-DROIDBEAM_URL=https://sms.domainmu.com DROIDBEAM_API_KEY=$KEY ./scripts/get-lan-ip.sh
+DROIDBEAM_URL=https://sms.example.com DROIDBEAM_API_KEY=$KEY ./scripts/get-lan-ip.sh
 ```
-Contoh output: `http://192.168.1.10:8080`.
+Example output: `http://192.168.1.10:8080`.
 
-Tambahkan `--check` agar hanya alamat yang terjangkau dari mesin tersebut (dan terverifikasi sebagai server yang sama) yang dicetak. Script ini setara dengan:
+Add `--check` to print only addresses reachable from the current machine (and verified to be the same server). The script is equivalent to:
 ```bash
-curl -H "X-API-Key: $KEY" https://sms.domainmu.com/api/v1/server-info
+curl -H "X-API-Key: $KEY" https://sms.example.com/api/v1/server-info
 # {"lan_urls":["http://192.168.1.10:8080"],"server_id":"3be7bd7b…"}
 ```
 
 ---
 
-## 4. Webhook
+## 4. Webhooks
 
-Semua event dikirim sebagai `POST` JSON ke `DROIDBEAM_WEBHOOK_URL`, dengan percobaan ulang hingga 4 kali.
+Every event is sent as a JSON `POST` to `DROIDBEAM_WEBHOOK_URL`, with up to 4 attempts.
 
 ```json
 { "event": "battery.threshold", "data": { … }, "sent_at": "2026-11-18T11:30:02Z" }
 ```
 
-| Event | Kapan | `data` |
+| Event | When | `data` |
 |---|---|---|
-| `message.status` | Status pesan berubah | objek pesan |
-| `sms.received` | SMS masuk ke HP | `{id, device_id, from, body, received_at, created_at, sim}` |
-| `battery.threshold` | Level melewati ambang (default 20% dan 80%) | `device`, `battery`, `threshold`, `direction` (`down`/`up`) |
-| `battery.full` | Baterai penuh | `device`, `battery` |
-| `battery.charger_connected` | Charger dicolok | `device`, `battery` |
-| `battery.charger_disconnected` | Charger dicabut | `device`, `battery` |
-| `device.online` | HP tersambung lagi | `device` |
-| `device.offline` | HP tidak menghubungi server > 2 menit | `device` |
+| `message.status` | A message's status changes | message object |
+| `sms.received` | The phone receives an SMS | `{id, device_id, from, body, received_at, created_at, sim}` |
+| `battery.threshold` | Level crosses a threshold (default 20% and 80%) | `device`, `battery`, `threshold`, `direction` (`down`/`up`) |
+| `battery.full` | Battery is full | `device`, `battery` |
+| `battery.charger_connected` | Charger plugged in | `device`, `battery` |
+| `battery.charger_disconnected` | Charger unplugged | `device`, `battery` |
+| `device.online` | Phone reconnects | `device` |
+| `device.offline` | Phone hasn't contacted the server for > 2 minutes | `device` |
 
-Contoh: "baterai turun ke 20%" berarti `event == "battery.threshold" && data.threshold == 20 && data.direction == "down"`, dan "baterai naik ke 80%" berarti `threshold == 80 && direction == "up"`. Untuk menambah ambang lain: `DROIDBEAM_BATTERY_THRESHOLDS=10,20,50,80`.
+Example: "battery dropped to 20%" is `event == "battery.threshold" && data.threshold == 20 && data.direction == "down"`, and "battery reached 80%" is `threshold == 80 && direction == "up"`. To add more thresholds: `DROIDBEAM_BATTERY_THRESHOLDS=10,20,50,80`.
 
-Header yang menyertai setiap request:
+Headers on every request:
 - `X-DroidBeam-Event: <event>`
-- `X-DroidBeam-Signature: sha256=<hex>` (kalau secret diisi), yaitu HMAC-SHA256 dari raw body dengan `DROIDBEAM_WEBHOOK_SECRET`.
+- `X-DroidBeam-Signature: sha256=<hex>` (when a secret is set): HMAC-SHA256 of the raw body using `DROIDBEAM_WEBHOOK_SECRET`.
 
-Contoh verifikasi (Node.js):
+Verification example (Node.js):
 ```js
 const sig = 'sha256=' + crypto.createHmac('sha256', SECRET).update(rawBody).digest('hex');
 const ok = crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(req.headers['x-droidbeam-signature']));
@@ -248,7 +259,7 @@ const ok = crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(req.headers['x-d
 
 ---
 
-## 5. Pengembangan
+## 5. Development
 
 ```bash
 cd server
@@ -259,21 +270,26 @@ cd android
 ./gradlew assembleDebug lintDebug
 ```
 
-### Build APK release
+### Release build
 
-Buat `android/keystore.properties` (sudah di-ignore git) yang menunjuk ke keystore-mu:
+Create `android/keystore.properties` (ignored by git) pointing to your keystore:
 ```properties
-storeFile=/path/ke/droidbeam-release.jks
+storeFile=/path/to/droidbeam-release.jks
 storePassword=...
 keyAlias=droidbeam
 keyPassword=...
 ```
-lalu jalankan `./gradlew assembleRelease`. Tanpa file itu, hasilnya APK release yang belum ditandatangani.
 
-> APK release dan APK debug ditandatangani dengan kunci berbeda. Untuk pindah dari debug ke release, uninstall app lama dulu, lalu daftarkan ulang perangkatnya.
+Then build everything into `release/`: server binaries for Linux (amd64, arm64, armv7), macOS (amd64, arm64) and Windows (amd64), the signed APK, and `SHA256SUMS`:
+```bash
+./scripts/build-release.sh 0.1.1
+```
+Without `keystore.properties`, Gradle produces an unsigned release APK.
 
-### Catatan
-- App ini tidak bisa dipublikasikan di Google Play (izin SMS dibatasi); pasang dengan sideload.
-- Token perangkat disimpan sebagai hash SHA-256 di server dan hanya ditampilkan sekali saat pendaftaran.
-- Dual SIM butuh izin *status telepon* (`READ_PHONE_STATE`) untuk melihat SIM mana yang ada sinyal.
-- Database dari versi lama otomatis di-upgrade saat server start.
+> Release and debug APKs are signed with different keys. To switch from a debug build to a release build, uninstall the old app first, then register the device again.
+
+### Notes
+- The app can't be published on Google Play (SMS permissions are restricted); install it by sideloading.
+- Device tokens are stored on the server as SHA-256 hashes and shown only once, at registration.
+- Dual SIM support needs the *phone state* permission (`READ_PHONE_STATE`) to see which SIM has service.
+- Databases from older versions are upgraded automatically when the server starts.

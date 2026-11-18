@@ -24,7 +24,7 @@ class SmsReceiver : BroadcastReceiver() {
             val uid = UUID.nameUUIDFromBytes("$from|$receivedAt|$body".toByteArray()).toString()
             ReportWorker.enqueueIncoming(context, uid, from, body, receivedAt, sim)
             GatewayState.countReceived()
-            GatewayState.log("SMS masuk dari $from${sim?.let { " (SIM $it)" } ?: ""}")
+            GatewayState.log("Incoming SMS from $from${sim?.let { " (SIM $it)" } ?: ""}")
         }
     }
 }

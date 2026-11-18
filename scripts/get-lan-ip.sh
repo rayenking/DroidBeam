@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# Ambil alamat LAN server DroidBeam lewat domain publiknya.
+# Get the LAN address(es) of a DroidBeam server via its public domain.
 #
-#   DROIDBEAM_URL=https://sms.domainmu.com DROIDBEAM_API_KEY=xxxx ./scripts/get-lan-ip.sh
+#   DROIDBEAM_URL=https://sms.example.com DROIDBEAM_API_KEY=xxxx ./scripts/get-lan-ip.sh
 #
-# Output: satu alamat per baris, contoh "http://192.168.1.10:8080".
-# Tambahkan --check untuk hanya menampilkan alamat yang benar-benar terjangkau dari mesin ini
-# (dan memang server yang sama, dicek lewat server_id).
+# Output: one address per line, e.g. "http://192.168.1.10:8080".
+# Add --check to print only addresses that are reachable from this machine
+# (and really are the same server, verified by server_id).
 set -euo pipefail
 
-: "${DROIDBEAM_URL:?set DROIDBEAM_URL ke domain publik, mis. https://sms.domainmu.com}"
+: "${DROIDBEAM_URL:?set DROIDBEAM_URL to the public domain, e.g. https://sms.example.com}"
 : "${DROIDBEAM_API_KEY:?set DROIDBEAM_API_KEY}"
 check=false
 [[ "${1:-}" == "--check" ]] && check=true

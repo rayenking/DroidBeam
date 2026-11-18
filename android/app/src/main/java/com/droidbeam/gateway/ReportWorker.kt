@@ -47,7 +47,7 @@ class ReportWorker(context: Context, params: WorkerParameters) : CoroutineWorker
         } catch (e: ApiException) {
             if (e.isClientError) {
                 // Retrying will not help (e.g. message unknown, token revoked).
-                GatewayState.log("Laporan ditolak server: ${e.message}")
+                GatewayState.log("Report rejected by server: ${e.message}")
                 Result.failure()
             } else {
                 Result.retry()

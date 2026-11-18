@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -80,10 +81,19 @@ func getenv(key, def string) string {
 	return def
 }
 
+// version is set at build time with -ldflags "-X main.version=...".
+var version = "dev"
+
 func main() {
 	// "healthcheck" lets the Docker HEALTHCHECK probe the server without curl in the image.
-	if len(os.Args) > 1 && os.Args[1] == "healthcheck" {
-		os.Exit(healthcheck())
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "healthcheck":
+			os.Exit(healthcheck())
+		case "version", "--version", "-v":
+			fmt.Println("droidbeam-server", version)
+			return
+		}
 	}
 	cfg := loadConfig()
 	store, err := OpenStore(cfg.DBPath)
@@ -122,7 +132,7 @@ func main() {
 		httpServer.Shutdown(shutdownCtx)
 	}()
 
-	log.Printf("DroidBeam server listening on %s (db: %s, id: %s)", cfg.Addr, cfg.DBPath, serverID)
+	log.Printf("DroidBeam server %s listening on %s (db: %s, id: %s)", version, cfg.Addr, cfg.DBPath, serverID)
 	log.Printf("LAN address(es) advertised to devices: %v", lanURLs(cfg))
 	if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Fatal(err)

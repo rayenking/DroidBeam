@@ -78,7 +78,7 @@ class GatewayService : Service() {
         }
         val prefs = Prefs(this)
         if (!prefs.isRegistered || !prefs.enabled) {
-            if (!prefs.isRegistered) GatewayState.error("Perangkat belum terdaftar")
+            if (!prefs.isRegistered) GatewayState.error("Device is not registered")
             stopSelf()
             return START_NOT_STICKY
         }
@@ -87,7 +87,7 @@ class GatewayService : Service() {
         WatchdogWorker.schedule(this)
         if (pollJob?.isActive != true) {
             GatewayState.setRunning(true)
-            GatewayState.log(if (intent == null) "Gateway dipulihkan oleh sistem" else "Gateway dimulai")
+            GatewayState.log(if (intent == null) "Gateway restored by system" else "Gateway started")
             pollJob = scope.launch { superviseLoop(ApiClient.forPrefs(prefs, http)) }
         }
         registerBatteryReceiver()
@@ -106,7 +106,7 @@ class GatewayService : Service() {
                 throw e
             } catch (e: Throwable) {
                 Log.e(TAG, "poll loop crashed", e)
-                GatewayState.error("Kesalahan internal: ${e.javaClass.simpleName}")
+                GatewayState.error("Internal error: ${e.javaClass.simpleName}")
                 delay(5_000)
             }
         }
@@ -120,7 +120,7 @@ class GatewayService : Service() {
                 api.maybeRestorePrimary()
                 val messages = api.fetchOutbox(POLL_WAIT_SECONDS)
                 GatewayState.connected()
-                updateNotification("Terhubung (${if (api.connection == "primary") "LAN" else "cloud"}) · menunggu SMS")
+                updateNotification("Connected (${if (api.connection == "primary") "LAN" else "cloud"}) · waiting for SMS")
                 backoffMs = MIN_BACKOFF_MS
                 for (msg in messages) {
                     sendOne(msg)
@@ -131,7 +131,7 @@ class GatewayService : Service() {
                 throw e
             } catch (e: ApiException) {
                 if (e.code == 401) {
-                    GatewayState.error("Token perangkat ditolak server. Daftarkan ulang perangkat.")
+                    GatewayState.error("Device token rejected by server. Register the device again.")
                     Prefs(this).enabled = false
                     stopSelf()
                     return false
@@ -139,13 +139,13 @@ class GatewayService : Service() {
                 GatewayState.error("Server: ${e.message}")
             } catch (e: IOException) {
                 if (!coroutineContext.isActive) break
-                GatewayState.error("Tidak bisa terhubung: ${e.message ?: e.javaClass.simpleName}")
+                GatewayState.error("Cannot connect: ${e.message ?: e.javaClass.simpleName}")
             } catch (e: Exception) {
                 // Malformed response etc. Never let it kill the service.
                 Log.e(TAG, "poll error", e)
-                GatewayState.error("Respons server tidak valid: ${e.javaClass.simpleName}")
+                GatewayState.error("Invalid server response: ${e.javaClass.simpleName}")
             }
-            updateNotification("Terputus · mencoba lagi dalam ${backoffMs / 1000} dtk")
+            updateNotification("Disconnected · retrying in ${backoffMs / 1000}s")
             networkBack.tryReceive() // discard stale signal
             withTimeoutOrNull(backoffMs) { networkBack.receive() } // wake early when network returns
             backoffMs = (backoffMs * 2).coerceAtMost(MAX_BACKOFF_MS)
@@ -156,13 +156,13 @@ class GatewayService : Service() {
     private fun sendOne(msg: OutboxMessage) {
         try {
             val slot = SmsSender.send(this, msg)
-            GatewayState.log("#${msg.id} mengirim ke ${msg.to}${slot?.let { " lewat SIM $it" } ?: ""}")
+            GatewayState.log("#${msg.id} sending to ${msg.to}${slot?.let { " via SIM $it" } ?: ""}")
         } catch (e: Exception) {
             // e.g. SecurityException when SEND_SMS was revoked, or an invalid number.
             val reason = e.message ?: e.javaClass.simpleName
             ReportWorker.enqueueStatus(this, msg.id, "failed", reason)
             GatewayState.countFailed()
-            GatewayState.log("#${msg.id} gagal: $reason")
+            GatewayState.log("#${msg.id} failed: $reason")
         }
     }
 
@@ -263,7 +263,7 @@ class GatewayService : Service() {
     // ---- notification ----
 
     private fun startInForeground() {
-        val notification = buildNotification(lastNotificationText ?: "Menghubungkan ke server…")
+        val notification = buildNotification(lastNotificationText ?: "Connecting to server…")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_REMOTE_MESSAGING)
         } else {
@@ -288,13 +288,13 @@ class GatewayService : Service() {
         )
         return NotificationCompat.Builder(this, App.CHANNEL_GATEWAY)
             .setSmallIcon(R.drawable.ic_stat_beam)
-            .setContentTitle("DroidBeam aktif")
+            .setContentTitle("DroidBeam active")
             .setContentText(text)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
             .setContentIntent(openApp)
-            .addAction(0, "Hentikan", stop)
+            .addAction(0, "Stop", stop)
             .build()
     }
 
@@ -315,7 +315,7 @@ class GatewayService : Service() {
         batteryReceiver = null
         releaseLocks()
         GatewayState.setRunning(false)
-        GatewayState.log("Gateway berhenti")
+        GatewayState.log("Gateway stopped")
         // Killed while the user still wants it on (low memory, OEM task killer): schedule recovery.
         if (Prefs(this).enabled) WatchdogWorker.checkSoon(this)
         super.onDestroy()
@@ -363,7 +363,7 @@ class GatewayService : Service() {
             } catch (e: Exception) {
                 // ForegroundServiceStartNotAllowedException / IllegalStateException
                 Log.w(TAG, "could not start gateway", e)
-                GatewayState.error("Android menolak menjalankan gateway di latar belakang. Nonaktifkan optimasi baterai.")
+                GatewayState.error("Android refused to start the gateway in the background. Disable battery optimization.")
                 false
             }
         }

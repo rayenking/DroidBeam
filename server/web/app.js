@@ -53,32 +53,32 @@
     });
     let data = null;
     try { data = await res.json(); } catch { /* empty */ }
-    if (res.status === 401) throw new AuthError("API key ditolak");
+    if (res.status === 401) throw new AuthError("API key rejected");
     if (!res.ok) throw new Error((data && data.error) || `HTTP ${res.status}`);
     return data;
   }
 
   // ---- formatting ----
-  const STATUS_LABEL = { queued: "Antre", sending: "Mengirim", sent: "Terkirim", delivered: "Diterima", failed: "Gagal" };
+  const STATUS_LABEL = { queued: "Queued", sending: "Sending", sent: "Sent", delivered: "Delivered", failed: "Failed" };
   function ago(iso) {
     if (!iso) return "–";
     const s = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000));
-    if (s < 5) return "baru saja";
-    if (s < 60) return `${s} dtk lalu`;
-    if (s < 3600) return `${Math.floor(s / 60)} mnt lalu`;
-    if (s < 86400) return `${Math.floor(s / 3600)} jam lalu`;
-    return `${Math.floor(s / 86400)} hari lalu`;
+    if (s < 5) return "just now";
+    if (s < 60) return `${s}s ago`;
+    if (s < 3600) return `${Math.floor(s / 60)} min ago`;
+    if (s < 86400) return `${Math.floor(s / 3600)} h ago`;
+    return `${Math.floor(s / 86400)} d ago`;
   }
   function clock(iso) {
     if (!iso) return "";
     const d = new Date(iso);
     const today = new Date();
-    const time = d.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-    return d.toDateString() === today.toDateString() ? time : `${d.toLocaleDateString("id-ID", { day: "numeric", month: "short" })} ${time}`;
+    const time = d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    return d.toDateString() === today.toDateString() ? time : `${d.toLocaleDateString("en-GB", { day: "numeric", month: "short" })} ${time}`;
   }
-  const PLUG = { ac: "charger AC", usb: "USB", wireless: "nirkabel", dock: "dock" };
-  const BATT = { charging: "mengisi", discharging: "tidak mengisi", full: "penuh", not_charging: "terhubung, tidak mengisi", unknown: "tidak diketahui" };
-  const NET = { wifi: "Wi-Fi", cellular: "Seluler", ethernet: "Ethernet", none: "Tanpa jaringan", other: "Lainnya" };
+  const PLUG = { ac: "charger AC", usb: "USB", wireless: "wireless", dock: "dock" };
+  const BATT = { charging: "charging", discharging: "discharging", full: "full", not_charging: "plugged in, not charging", unknown: "unknown" };
+  const NET = { wifi: "Wi-Fi", cellular: "Cellular", ethernet: "Ethernet", none: "No network", other: "Other" };
 
   // SMS segment estimate: GSM-7 = 160/153 chars, otherwise UCS-2 = 70/67.
   const GSM7 = /^[@£$¥èéùìòÇ\nØø\rÅåΔ_ΦΓΛΩΠΨΣΘΞÆæßÉ !"#¤%&'()*+,\-./0-9:;<=>?¡A-ZÄÖÑÜ§¿a-zäöñüà^{}\\[~\]|€]*$/;
@@ -94,14 +94,14 @@
   function renderStats(stats, devices) {
     const online = devices.filter((d) => d.online).length;
     $("st-online").textContent = `${online}/${devices.length}`;
-    $("st-online-foot").textContent = devices.length ? (online === devices.length ? "semua terhubung" : `${devices.length - online} offline`) : "belum ada perangkat";
+    $("st-online-foot").textContent = devices.length ? (online === devices.length ? "all connected" : `${devices.length - online} offline`) : "no devices yet";
     const t = stats.today.messages;
     const sent = (t.sent || 0) + (t.delivered || 0);
     $("st-sent").textContent = sent;
-    $("st-sent-foot").textContent = `${t.delivered || 0} dikonfirmasi diterima`;
+    $("st-sent-foot").textContent = `${t.delivered || 0} confirmed delivered`;
     $("st-failed").textContent = t.failed || 0;
     const pending = (t.queued || 0) + (t.sending || 0);
-    $("st-failed-foot").textContent = pending ? `${pending} masih dalam antrean` : "antrean kosong";
+    $("st-failed-foot").textContent = pending ? `${pending} still queued` : "queue empty";
     $("st-inbox").textContent = stats.today.inbox;
     const beam = $("beam");
     beam.classList.toggle("is-live", online > 0);
@@ -110,12 +110,12 @@
 
   // ---- render: devices ----
   function batteryBlock(b) {
-    if (!b) return h("p", { class: "muted", text: "Belum ada data baterai" });
+    if (!b) return h("p", { class: "muted", text: "No battery data yet" });
     const lit = Math.round(b.level / 10);
     const cls = ["battery", b.level <= 20 ? "low" : b.level <= 40 ? "mid" : "", b.status === "charging" ? "charging" : ""].join(" ");
     const state = [BATT[b.status] || b.status, b.plugged && b.plugged !== "none" ? `via ${PLUG[b.plugged] || b.plugged}` : null,
       b.temperature != null ? `${b.temperature.toFixed(1)}°C` : null].filter(Boolean).join(" · ");
-    const cells = h("div", { class: "cells", role: "img", "aria-label": `Baterai ${b.level}%` });
+    const cells = h("div", { class: "cells", role: "img", "aria-label": `Battery ${b.level}%` });
     for (let i = 0; i < 10; i++) cells.append(h("span", { class: i < lit ? "cell on" : "cell" }));
     return h("div", { class: cls },
       h("div", { class: "battery-row" },
@@ -131,34 +131,34 @@
         h("span", { class: "sim-slot", text: `SIM ${s.slot}` }),
         h("span", { class: "sim-carrier", text: s.carrier || "–" }),
         s.default_sms ? h("span", { class: "tag", text: "default SMS" }) : null,
-        h("span", { class: "sim-sig", text: s.in_service ? "ada sinyal" : "tanpa layanan" }))));
+        h("span", { class: "sim-sig", text: s.in_service ? "in service" : "no service" }))));
   }
 
   function renderDevices(devices) {
     const box = $("devices");
-    $("device-count").textContent = devices.length ? `${devices.length} terdaftar` : "";
+    $("device-count").textContent = devices.length ? `${devices.length} registered` : "";
     if (!devices.length) {
-      box.replaceChildren(h("p", { class: "empty", text: "Belum ada perangkat. Daftarkan HP lewat app DroidBeam." }));
+      box.replaceChildren(h("p", { class: "empty", text: "No devices yet. Register a phone from the DroidBeam app." }));
       return;
     }
     box.replaceChildren(...devices.map((d) => {
       const i = d.info || {};
       const model = [i.manufacturer, i.model].filter(Boolean).join(" ");
       const sub = [model, i.android_version ? `Android ${i.android_version}` : null].filter(Boolean).join(" · ");
-      const conn = i.connection === "fallback" ? "Cloud (cadangan)" : i.connection === "primary" ? "LAN" : "–";
+      const conn = i.connection === "fallback" ? "Cloud (fallback)" : i.connection === "primary" ? "LAN" : "–";
       return h("article", { class: `device ${d.online ? "" : "is-offline"}` },
         h("div", { class: "device-top" },
           h("div", null,
             h("div", { class: "device-name", text: d.name }),
-            h("div", { class: "device-sub", text: sub || `Perangkat #${d.id}` })),
+            h("div", { class: "device-sub", text: sub || `Device #${d.id}` })),
           h("span", { class: `pulse ${d.online ? "on" : "off"}`, text: d.online ? "Online" : "Offline" })),
         batteryBlock(d.battery),
         simList(i.sims),
         h("dl", { class: "kv" },
-          h("dt", { text: "Jalur" }), h("dd", { text: conn }),
-          h("dt", { text: "Jaringan" }), h("dd", { text: [NET[i.network] || i.network, i.operator].filter(Boolean).join(" · ") || "–" }),
-          h("dt", { text: "IP HP" }), h("dd", { text: i.local_ip || "–" }),
-          h("dt", { text: "Terakhir" }), h("dd", { text: ago(d.last_seen_at), title: d.last_seen_at || "" }),
+          h("dt", { text: "Route" }), h("dd", { text: conn }),
+          h("dt", { text: "Network" }), h("dd", { text: [NET[i.network] || i.network, i.operator].filter(Boolean).join(" · ") || "–" }),
+          h("dt", { text: "Phone IP" }), h("dd", { text: i.local_ip || "–" }),
+          h("dt", { text: "Last seen" }), h("dd", { text: ago(d.last_seen_at), title: d.last_seen_at || "" }),
           h("dt", { text: "ID / app" }), h("dd", { text: `#${d.id}${i.app_version ? ` · v${i.app_version}` : ""}` })));
     }));
   }
@@ -166,7 +166,7 @@
   function renderDeviceSelect(devices) {
     const sel = $("send-device");
     const current = sel.value;
-    sel.replaceChildren(h("option", { value: "", text: "Otomatis" }),
+    sel.replaceChildren(h("option", { value: "", text: "Auto" }),
       ...devices.map((d) => h("option", { value: String(d.id), text: `${d.name}${d.online ? "" : " (offline)"}` })));
     if ([...sel.options].some((o) => o.value === current)) sel.value = current;
   }
@@ -175,7 +175,7 @@
   function renderMessages(msgs) {
     const body = $("messages");
     if (!msgs.length) {
-      body.replaceChildren(h("tr", null, h("td", { colspan: "6", class: "empty", text: statusFilter ? "Tidak ada pesan dengan status ini" : "Belum ada pesan" })));
+      body.replaceChildren(h("tr", null, h("td", { colspan: "6", class: "empty", text: statusFilter ? "No messages with this status" : "No messages yet" })));
       return;
     }
     body.replaceChildren(...msgs.map((m) => h("tr", null,
@@ -190,7 +190,7 @@
   function renderInbox(items) {
     const list = $("inbox");
     if (!items.length) {
-      list.replaceChildren(h("li", { class: "empty", text: "Belum ada SMS masuk" }));
+      list.replaceChildren(h("li", { class: "empty", text: "No incoming SMS yet" }));
       return;
     }
     const names = Object.fromEntries(devicesCache.map((d) => [d.id, d.name]));
@@ -199,7 +199,7 @@
         h("span", { class: "inbox-from", text: m.from }),
         h("span", { class: "mono muted", text: clock(m.received_at), title: m.received_at })),
       h("div", { class: "inbox-body", text: m.body }),
-      h("div", { class: "mono muted", text: [names[m.device_id] || `Perangkat #${m.device_id}`, m.sim ? `SIM ${m.sim}` : null].filter(Boolean).join(" · ") }))));
+      h("div", { class: "mono muted", text: [names[m.device_id] || `Device #${m.device_id}`, m.sim ? `SIM ${m.sim}` : null].filter(Boolean).join(" · ") }))));
   }
 
   // ---- refresh loop ----
@@ -218,10 +218,10 @@
       renderDeviceSelect(devices.data);
       renderMessages(msgs.data);
       renderInbox(inbox.data);
-      $("meta-refresh").textContent = `diperbarui ${new Date().toLocaleTimeString("id-ID")}`;
+      $("meta-refresh").textContent = `updated ${new Date().toLocaleTimeString("en-GB")}`;
     } catch (e) {
       if (e instanceof AuthError) return logout(e.message);
-      $("meta-refresh").textContent = `gagal memuat: ${e.message}`;
+      $("meta-refresh").textContent = `failed to load: ${e.message}`;
       $("beam").classList.add("is-down");
     }
   }
@@ -261,12 +261,12 @@
   $("login-form").addEventListener("submit", async (ev) => {
     ev.preventDefault();
     const key = $("login-key").value.trim();
-    if (!key) { $("login-error").textContent = "Isi API key dulu"; return; }
+    if (!key) { $("login-error").textContent = "Enter the API key first"; return; }
     apiKey = key;
     try {
       await api("/api/v1/stats");
     } catch (e) {
-      $("login-error").textContent = e instanceof AuthError ? "API key salah" : `Server tidak bisa dihubungi: ${e.message}`;
+      $("login-error").textContent = e instanceof AuthError ? "Wrong API key" : `Cannot reach server: ${e.message}`;
       apiKey = "";
       return;
     }
@@ -290,7 +290,7 @@
   const bodyEl = $("send-body");
   function updateMeta() {
     const n = [...bodyEl.value].length;
-    $("send-meta").textContent = `${n} karakter · ${segments(bodyEl.value)} SMS`;
+    $("send-meta").textContent = `${n} characters · ${segments(bodyEl.value)} SMS`;
   }
   bodyEl.addEventListener("input", updateMeta);
   $("send-to").addEventListener("input", () => { $("send-result").textContent = ""; });
@@ -301,8 +301,8 @@
     const to = $("send-to").value.replace(/[\s-]/g, "");
     const body = bodyEl.value;
     note.className = "form-note err";
-    if (!/^\+?\d{3,20}$/.test(to)) { note.textContent = "Nomor tujuan hanya boleh angka (boleh diawali +)"; return; }
-    if (!body.trim()) { note.textContent = "Pesan tidak boleh kosong"; return; }
+    if (!/^\+?\d{3,20}$/.test(to)) { note.textContent = "Phone number may only contain digits (optionally starting with +)"; return; }
+    if (!body.trim()) { note.textContent = "Message cannot be empty"; return; }
     const payload = { to, body };
     if ($("send-device").value) payload.device_id = Number($("send-device").value);
     if ($("send-sim").value) payload.sim = Number($("send-sim").value);
@@ -312,13 +312,13 @@
     try {
       const m = await api("/api/v1/messages", { method: "POST", body: JSON.stringify(payload) });
       note.className = "form-note ok";
-      note.textContent = `Pesan #${m.id} masuk antrean`;
+      note.textContent = `Message #${m.id} queued`;
       bodyEl.value = "";
       updateMeta();
       refresh();
     } catch (e) {
       if (e instanceof AuthError) return logout(e.message);
-      note.textContent = `Gagal: ${e.message}`;
+      note.textContent = `Failed: ${e.message}`;
     } finally {
       btn.disabled = false;
     }

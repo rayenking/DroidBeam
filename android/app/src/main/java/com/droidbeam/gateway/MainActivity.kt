@@ -134,28 +134,28 @@ class MainActivity : ComponentActivity() {
         var error by remember { mutableStateOf<String?>(null) }
         val scope = rememberCoroutineScope()
 
-        Section("Hubungkan ke server") {
+        Section("Connect to server") {
             OutlinedTextField(
                 url, { url = it }, Modifier.fillMaxWidth(),
-                label = { Text("Alamat LAN (opsional jika auto)") }, singleLine = true,
+                label = { Text("LAN address (optional with auto-discovery)") }, singleLine = true,
                 placeholder = { Text("http://192.168.1.10:8080") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
             )
             OutlinedTextField(
                 fallback, { fallback = it }, Modifier.fillMaxWidth(),
-                label = { Text("Alamat cloud / domain") }, singleLine = true,
+                label = { Text("Cloud / domain address") }, singleLine = true,
                 placeholder = { Text("https://sms.domainmu.com") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
             )
             AutoLanSwitch(autoLan) { autoLan = it }
             OutlinedTextField(
                 apiKey, { apiKey = it }, Modifier.fillMaxWidth(),
-                label = { Text("API key server") }, singleLine = true,
+                label = { Text("Server API key") }, singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
             )
             OutlinedTextField(
                 name, { name = it }, Modifier.fillMaxWidth(),
-                label = { Text("Nama perangkat") }, singleLine = true,
+                label = { Text("Device name") }, singleLine = true,
             )
             error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             Button(
@@ -183,12 +183,12 @@ class MainActivity : ComponentActivity() {
                             prefs.deviceToken = reg.token
                             prefs.deviceId = reg.deviceId
                             prefs.deviceName = reg.name
-                            GatewayState.log("Terdaftar sebagai perangkat #${reg.deviceId}")
+                            GatewayState.log("Registered as device #${reg.deviceId}")
                             refresh()
-                        }.onFailure { error = "Gagal mendaftar: ${it.message ?: it.javaClass.simpleName}" }
+                        }.onFailure { error = "Registration failed: ${it.message ?: it.javaClass.simpleName}" }
                     }
                 },
-            ) { Text(if (busy) "Mendaftarkan…" else "Daftarkan perangkat") }
+            ) { Text(if (busy) "Registering…" else "Register device") }
         }
     }
 
@@ -206,24 +206,24 @@ class MainActivity : ComponentActivity() {
 
         Section("Server") {
             Text(
-                "Perangkat #${prefs.deviceId} · ${prefs.deviceName}",
+                "Device #${prefs.deviceId} · ${prefs.deviceName}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             OutlinedTextField(
                 url, { url = it }, Modifier.fillMaxWidth(),
-                label = { Text("Alamat LAN") }, singleLine = true, enabled = !running,
+                label = { Text("LAN address") }, singleLine = true, enabled = !running,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
             )
             OutlinedTextField(
                 fallback, { fallback = it }, Modifier.fillMaxWidth(),
-                label = { Text("Alamat cloud / domain") }, singleLine = true, enabled = !running,
+                label = { Text("Cloud / domain address") }, singleLine = true, enabled = !running,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
             )
             AutoLanSwitch(autoLan, enabled = !running) { autoLan = it }
             if (running) {
                 Text(
-                    "Hentikan gateway untuk mengubah alamat.",
+                    "Stop the gateway to change addresses.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -235,13 +235,13 @@ class MainActivity : ComponentActivity() {
                         prefs.serverUrl = url.trim().trimEnd('/')
                         prefs.fallbackUrl = fallback.trim().trimEnd('/')
                         prefs.autoLan = autoLan
-                        GatewayState.log("Alamat server diperbarui")
+                        GatewayState.log("Server addresses updated")
                     },
-                ) { Text("Simpan alamat") }
+                ) { Text("Save addresses") }
                 TextButton(
                     enabled = !running,
                     onClick = { prefs.clearRegistration(); refresh() },
-                ) { Text("Lepas perangkat") }
+                ) { Text("Unregister device") }
             }
         }
     }
@@ -250,9 +250,9 @@ class MainActivity : ComponentActivity() {
     private fun AutoLanSwitch(checked: Boolean, enabled: Boolean = true, onChange: (Boolean) -> Unit) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text("Cari IP LAN otomatis lewat domain", style = MaterialTheme.typography.bodyMedium)
+                Text("Discover LAN address via domain", style = MaterialTheme.typography.bodyMedium)
                 Text(
-                    "Server memberi tahu IP LAN-nya; app pindah ke LAN bila terjangkau.",
+                    "The server reports its LAN address; the app switches to LAN when reachable.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -263,26 +263,26 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     private fun PermissionCard() {
-        Section("Izin & baterai") {
+        Section("Permissions & battery") {
             if (permissionsOk) {
-                Text("✓ Izin SMS, SIM, dan notifikasi sudah diberikan")
+                Text("✓ SMS, SIM and notification permissions granted")
             } else {
-                Text("App butuh izin kirim/terima SMS, status SIM, dan notifikasi.")
-                Button(onClick = { permissionLauncher.launch(requiredPermissions) }) { Text("Berikan izin") }
+                Text("The app needs permission to send/receive SMS, read SIM status and show notifications.")
+                Button(onClick = { permissionLauncher.launch(requiredPermissions) }) { Text("Grant permissions") }
             }
             if (batteryExempt) {
-                Text("✓ DroidBeam dikecualikan dari optimasi baterai")
+                Text("✓ DroidBeam is exempt from battery optimization")
             } else {
                 Text(
-                    "Supaya gateway tidak dimatikan sistem dan bisa hidup lagi sendiri, " +
-                        "kecualikan DroidBeam dari optimasi baterai.",
+                    "So the system doesn't kill the gateway and it can restart on its own, " +
+                        "exempt DroidBeam from battery optimization.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Button(onClick = { requestBatteryExemption() }) { Text("Kecualikan dari optimasi baterai") }
+                Button(onClick = { requestBatteryExemption() }) { Text("Exempt from battery optimization") }
             }
             Text(
-                "HP Xiaomi/Oppo/Vivo/Realme/Samsung: aktifkan juga \"Autostart\" dan set baterai ke \"Tanpa batasan\" di pengaturan app.",
+                "Xiaomi/Oppo/Vivo/Realme/Samsung: also enable \"Autostart\" and set battery to \"No restrictions\" in the app settings.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -290,7 +290,7 @@ class MainActivity : ComponentActivity() {
                 startActivity(
                     Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")),
                 )
-            }) { Text("Buka pengaturan app") }
+            }) { Text("Open app settings") }
         }
     }
 
@@ -307,12 +307,12 @@ class MainActivity : ComponentActivity() {
         Section("Gateway") {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text(if (state.running) "Berjalan" else "Berhenti", style = MaterialTheme.typography.titleMedium)
+                    Text(if (state.running) "Running" else "Stopped", style = MaterialTheme.typography.titleMedium)
                     val status = when {
-                        !state.running -> "Nyalakan untuk mulai mengirim dan meneruskan SMS"
-                        state.connected -> "Terhubung ke server"
+                        !state.running -> "Turn on to start sending and forwarding SMS"
+                        state.connected -> "Connected to server"
                         state.lastError != null -> state.lastError
-                        else -> "Menghubungkan…"
+                        else -> "Connecting…"
                     }
                     Text(status, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
@@ -327,21 +327,21 @@ class MainActivity : ComponentActivity() {
             }
             if (state.running && state.connected) {
                 Text(
-                    "Koneksi: ${state.endpointLabel ?: "-"}${state.endpointUrl?.let { " · $it" } ?: ""}",
+                    "Connection: ${state.endpointLabel ?: "-"}${state.endpointUrl?.let { " · $it" } ?: ""}",
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
             Text(
-                "Baterai: ${state.battery ?: DeviceReporter.battery(this@MainActivity)?.describe() ?: "-"}",
+                "Battery: ${state.battery ?: DeviceReporter.battery(this@MainActivity)?.describe() ?: "-"}",
                 style = MaterialTheme.typography.bodySmall,
             )
             SimManager.list(this@MainActivity).forEach {
                 Text(it.describe(), style = MaterialTheme.typography.bodySmall)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                Stat("Terkirim", state.sent)
-                Stat("Gagal", state.failed)
-                Stat("Masuk", state.received)
+                Stat("Sent", state.sent)
+                Stat("Failed", state.failed)
+                Stat("Received", state.received)
             }
         }
     }
@@ -356,9 +356,9 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     private fun LogCard(lines: List<String>) {
-        Section("Aktivitas") {
+        Section("Activity") {
             if (lines.isEmpty()) {
-                Text("Belum ada aktivitas", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("No activity yet", color = MaterialTheme.colorScheme.onSurfaceVariant)
             } else {
                 lines.take(30).forEach {
                     Text(it, fontFamily = FontFamily.Monospace, fontSize = 12.sp)

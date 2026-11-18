@@ -20,7 +20,7 @@ class WatchdogWorker(context: Context, params: WorkerParameters) : CoroutineWork
         val prefs = Prefs(applicationContext)
         if (!prefs.enabled || !prefs.isRegistered) return Result.success()
         if (!GatewayService.isRunning) {
-            GatewayState.log("Watchdog: menyalakan ulang gateway")
+            GatewayState.log("Watchdog: restarting gateway")
             GatewayService.ensureRunning(applicationContext)
         }
         return Result.success()

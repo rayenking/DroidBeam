@@ -22,7 +22,7 @@ object SimManager {
         val inService: Boolean,
         val defaultSms: Boolean,
     ) {
-        fun describe() = "SIM $slot · $carrier · ${if (inService) "ada sinyal" else "tanpa layanan"}" +
+        fun describe() = "SIM $slot · $carrier · ${if (inService) "in service" else "no service"}" +
             if (defaultSms) " · default SMS" else ""
     }
 
@@ -60,7 +60,7 @@ object SimManager {
         if (sims.isEmpty()) return null
         if (requestedSlot != null) {
             return sims.firstOrNull { it.slot == requestedSlot }
-                ?: throw IllegalArgumentException("SIM $requestedSlot tidak terpasang")
+                ?: throw IllegalArgumentException("SIM $requestedSlot is not installed")
         }
         val default = sims.firstOrNull { it.defaultSms }
         if (default != null && default.inService) return default

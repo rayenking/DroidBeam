@@ -34,10 +34,10 @@ object DeviceReporter {
 
         fun describe(): String {
             val state = when (status) {
-                "charging" -> "mengisi"
-                "full" -> "penuh"
-                "discharging" -> "tidak mengisi"
-                "not_charging" -> "tidak mengisi (terhubung)"
+                "charging" -> "charging"
+                "full" -> "full"
+                "discharging" -> "discharging"
+                "not_charging" -> "not charging (plugged in)"
                 else -> status
             }
             val via = if (plugged != "none") " via ${plugged.uppercase()}" else ""
