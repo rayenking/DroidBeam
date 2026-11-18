@@ -1,0 +1,6 @@
+*.db
+*.db-shm
+*.db-wal
+droidbeam-server
+Dockerfile
+.dockerignore

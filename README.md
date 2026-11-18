@@ -36,6 +36,27 @@ Simpan API key itu. Key ini dipakai aplikasimu dan saat mendaftarkan HP.
 | `DROIDBEAM_OFFLINE_AFTER` | `2m` | HP dianggap offline kalau tidak menghubungi server selama ini |
 | `DROIDBEAM_SEND_TIMEOUT` | `10m` | Pesan yang diambil HP tapi tidak dilaporkan hasilnya ditandai `failed` |
 
+### Docker
+
+```bash
+cp .env.example .env      # isi DROIDBEAM_API_KEY dan DROIDBEAM_LAN_URL
+docker compose up -d
+docker compose logs -f
+```
+
+- Image-nya kecil (±13 MB): binary Go statis di atas `distroless`, berjalan sebagai user non-root.
+- Database disimpan di volume `droidbeam-data` (`/data/droidbeam.db`), jadi tidak hilang saat container dibuat ulang.
+- **Isi `DROIDBEAM_LAN_URL`** dengan IP LAN host Docker, misalnya `http://192.168.1.10:8080`. Dari dalam container, server tidak bisa melihat IP LAN host.
+- Container punya healthcheck ke `/healthz` dan otomatis restart (`restart: unless-stopped`).
+- Zona waktu default `Asia/Jakarta`. Zona ini dipakai untuk hitungan "hari ini" di dashboard; ubah lewat `TZ`.
+
+Tanpa compose:
+```bash
+docker build -t droidbeam-server ./server
+docker run -d --name droidbeam -p 8080:8080 -v droidbeam-data:/data \
+  -e DROIDBEAM_API_KEY=... -e DROIDBEAM_LAN_URL=http://192.168.1.10:8080 droidbeam-server
+```
+
 ### LAN + domain publik (satu server, dua alamat)
 
 Jalankan server di jaringan lokal, lalu ekspos ke internet lewat domain, misalnya dengan Cloudflare Tunnel, reverse proxy di VPS, atau port forwarding + HTTPS. Hasilnya, server yang sama bisa diakses lewat:
@@ -66,6 +87,9 @@ API key hanya disimpan di browser (sessionStorage, atau localStorage kalau "Inga
 
 ## 2. Memasang app Android
 
+**Cara termudah:** unduh APK dari halaman [Releases](https://github.com/rayenking/DroidBeam/releases/latest), lalu pasang di HP (izinkan "instal dari sumber tidak dikenal").
+
+Atau build sendiri:
 ```bash
 cd android
 ./gradlew assembleDebug
@@ -234,6 +258,19 @@ go test ./...
 cd android
 ./gradlew assembleDebug lintDebug
 ```
+
+### Build APK release
+
+Buat `android/keystore.properties` (sudah di-ignore git) yang menunjuk ke keystore-mu:
+```properties
+storeFile=/path/ke/droidbeam-release.jks
+storePassword=...
+keyAlias=droidbeam
+keyPassword=...
+```
+lalu jalankan `./gradlew assembleRelease`. Tanpa file itu, hasilnya APK release yang belum ditandatangani.
+
+> APK release dan APK debug ditandatangani dengan kunci berbeda. Untuk pindah dari debug ke release, uninstall app lama dulu, lalu daftarkan ulang perangkatnya.
 
 ### Catatan
 - App ini tidak bisa dipublikasikan di Google Play (izin SMS dibatasi); pasang dengan sideload.

@@ -3,3 +3,8 @@
 *.db-wal
 server/droidbeam-server
 .DS_Store
+.env
+*.jks
+*.keystore
+keystore.properties
+release/

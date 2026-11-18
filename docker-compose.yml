@@ -1,0 +1,23 @@
+# Usage: cp .env.example .env, fill in the values, then: docker compose up -d
+services:
+  droidbeam:
+    build: ./server
+    image: droidbeam-server:latest
+    container_name: droidbeam
+    restart: unless-stopped
+    ports:
+      - "${DROIDBEAM_PORT:-8080}:8080"
+    environment:
+      DROIDBEAM_API_KEY: ${DROIDBEAM_API_KEY:?set DROIDBEAM_API_KEY in .env}
+      # Inside Docker the server cannot see the host's LAN IP, so set it here,
+      # e.g. http://192.168.1.10:8080 (comma-separated for several).
+      DROIDBEAM_LAN_URL: ${DROIDBEAM_LAN_URL:-}
+      DROIDBEAM_WEBHOOK_URL: ${DROIDBEAM_WEBHOOK_URL:-}
+      DROIDBEAM_WEBHOOK_SECRET: ${DROIDBEAM_WEBHOOK_SECRET:-}
+      DROIDBEAM_BATTERY_THRESHOLDS: ${DROIDBEAM_BATTERY_THRESHOLDS:-20,80}
+      TZ: ${TZ:-Asia/Jakarta}
+    volumes:
+      - droidbeam-data:/data
+
+volumes:
+  droidbeam-data:

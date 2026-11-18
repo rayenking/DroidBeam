@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -80,6 +81,10 @@ func getenv(key, def string) string {
 }
 
 func main() {
+	// "healthcheck" lets the Docker HEALTHCHECK probe the server without curl in the image.
+	if len(os.Args) > 1 && os.Args[1] == "healthcheck" {
+		os.Exit(healthcheck())
+	}
 	cfg := loadConfig()
 	store, err := OpenStore(cfg.DBPath)
 	if err != nil {
@@ -151,4 +156,22 @@ func (s *Server) sweepStale(ctx context.Context) {
 			}
 		}
 	}
+}
+
+// healthcheck calls /healthz on the local server and returns a process exit code.
+func healthcheck() int {
+	_, port, err := net.SplitHostPort(getenv("DROIDBEAM_ADDR", ":8080"))
+	if err != nil {
+		return 1
+	}
+	client := &http.Client{Timeout: 3 * time.Second}
+	resp, err := client.Get("http://" + net.JoinHostPort("127.0.0.1", port) + "/healthz")
+	if err != nil {
+		return 1
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return 1
+	}
+	return 0
 }
