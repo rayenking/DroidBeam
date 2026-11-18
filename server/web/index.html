@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>DroidBeam · Konsol</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230F766E'/%3E%3Cpath d='M8 9h16a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3h-9l-5 4v-4H8a3 3 0 0 1-3-3v-8a3 3 0 0 1 3-3z' fill='%23fff'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Login -->
+  <section id="login" class="login" hidden>
+    <form id="login-form" class="login-card" autocomplete="off">
+      <div class="brand brand-lg"><span class="brand-mark" aria-hidden="true"></span>DroidBeam</div>
+      <p class="login-sub">Konsol SMS gateway</p>
+      <label class="field">
+        <span>API key server</span>
+        <input id="login-key" type="password" required spellcheck="false" placeholder="DROIDBEAM_API_KEY">
+      </label>
+      <label class="check"><input id="login-remember" type="checkbox"> Ingat di browser ini</label>
+      <p id="login-error" class="form-error" role="alert"></p>
+      <button class="btn btn-primary" type="submit">Masuk</button>
+    </form>
+  </section>
+
+  <!-- App -->
+  <div id="app" hidden>
+    <header class="topbar">
+      <div class="brand"><span class="brand-mark" aria-hidden="true"></span>DroidBeam</div>
+      <div class="beam" id="beam" aria-hidden="true"><span></span></div>
+      <div class="topbar-meta">
+        <span class="meta" id="meta-lan" title="Alamat LAN server"></span>
+        <span class="meta" id="meta-refresh">memuat…</span>
+        <button class="btn btn-ghost btn-sm" id="logout" type="button">Keluar</button>
+      </div>
+    </header>
+
+    <main class="wrap">
+      <section class="stats" aria-label="Ringkasan hari ini">
+        <div class="stat"><span class="stat-label">Perangkat online</span><span class="stat-value" id="st-online">–</span><span class="stat-foot" id="st-online-foot"></span></div>
+        <div class="stat"><span class="stat-label">Terkirim hari ini</span><span class="stat-value" id="st-sent">–</span><span class="stat-foot" id="st-sent-foot"></span></div>
+        <div class="stat stat-warn"><span class="stat-label">Gagal hari ini</span><span class="stat-value" id="st-failed">–</span><span class="stat-foot" id="st-failed-foot"></span></div>
+        <div class="stat"><span class="stat-label">SMS masuk hari ini</span><span class="stat-value" id="st-inbox">–</span><span class="stat-foot">dari semua perangkat</span></div>
+      </section>
+
+      <div class="grid-top">
+        <section class="panel" aria-labelledby="h-devices">
+          <div class="panel-head"><h2 id="h-devices">Perangkat</h2><span class="count" id="device-count"></span></div>
+          <div id="devices" class="devices"></div>
+        </section>
+
+        <section class="panel" aria-labelledby="h-send">
+          <div class="panel-head"><h2 id="h-send">Kirim SMS</h2></div>
+          <form id="send-form" class="send">
+            <label class="field"><span>Nomor tujuan</span>
+              <input id="send-to" required inputmode="tel" placeholder="08123456789 / +628123456789" autocomplete="off"></label>
+            <label class="field"><span>Pesan</span>
+              <textarea id="send-body" required rows="4" maxlength="1600" placeholder="Tulis pesan…"></textarea></label>
+            <div class="send-meta" id="send-meta">0 karakter · 0 SMS</div>
+            <div class="row2">
+              <label class="field"><span>Perangkat</span><select id="send-device"><option value="">Otomatis</option></select></label>
+              <label class="field"><span>SIM</span><select id="send-sim">
+                <option value="">Otomatis</option><option value="1">SIM 1</option><option value="2">SIM 2</option></select></label>
+            </div>
+            <p id="send-result" class="form-note" role="status"></p>
+            <button class="btn btn-primary" type="submit" id="send-btn">Kirim</button>
+          </form>
+        </section>
+      </div>
+
+      <div class="grid-bottom">
+        <section class="panel" aria-labelledby="h-messages">
+          <div class="panel-head">
+            <h2 id="h-messages">Pesan keluar</h2>
+            <div class="chips" id="status-filter" role="group" aria-label="Filter status">
+              <button type="button" class="chip is-on" data-status="">Semua</button>
+              <button type="button" class="chip" data-status="queued">Antre</button>
+              <button type="button" class="chip" data-status="sending">Mengirim</button>
+              <button type="button" class="chip" data-status="sent">Terkirim</button>
+              <button type="button" class="chip" data-status="delivered">Diterima</button>
+              <button type="button" class="chip" data-status="failed">Gagal</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="table">
+              <thead><tr><th>#</th><th>Tujuan</th><th>Pesan</th><th>Status</th><th>SIM</th><th>Waktu</th></tr></thead>
+              <tbody id="messages"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel" aria-labelledby="h-inbox">
+          <div class="panel-head"><h2 id="h-inbox">SMS masuk</h2></div>
+          <ul id="inbox" class="inbox"></ul>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
