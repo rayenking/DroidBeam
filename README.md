@@ -331,7 +331,7 @@ keyPassword=...
 
 Then build everything into `release/`: server binaries for Linux (amd64, arm64, armv7), macOS (amd64, arm64) and Windows (amd64), the signed APK, and `SHA256SUMS`:
 ```bash
-./scripts/build-release.sh 0.1.1
+./scripts/build-release.sh 0.1.2
 ```
 Without `keystore.properties`, Gradle produces an unsigned release APK.
 
