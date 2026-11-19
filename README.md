@@ -1,6 +1,34 @@
-# DroidBeam — Android SMS Gateway
+<div align="center">
 
-Turn an Android phone into an SMS gateway. Your application calls the server's REST API, the server hands the message to the phone, and the phone sends it through its SIM. Incoming SMS on the phone are forwarded back to the server and delivered to you via webhook.
+# DroidBeam
+
+**Turn any Android phone into a self-hosted SMS gateway.**
+
+Send and receive SMS through a simple REST API, with a single-binary Go server, a live web dashboard and webhooks.
+
+[![Release](https://img.shields.io/github/v/release/rayenking/DroidBeam?label=release)](https://github.com/rayenking/DroidBeam/releases/latest)
+![Go](https://img.shields.io/badge/server-Go-00ADD8?logo=go&logoColor=white)
+![Android](https://img.shields.io/badge/app-Android%208.0%2B-3DDC84?logo=android&logoColor=white)
+![Docker](https://img.shields.io/badge/docker-~13%20MB-2496ED?logo=docker&logoColor=white)
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/dashboard-dark.png">
+  <img alt="DroidBeam dashboard: devices with battery and SIM status, send form, outgoing messages and incoming SMS" src="docs/screenshots/dashboard-light.png" width="900">
+</picture>
+
+</div>
+
+## Features
+
+- **REST API** to send SMS and read incoming messages, with delivery reports (`queued` → `sending` → `sent` → `delivered` / `failed`).
+- **Multiple phones and dual SIM**: pick a device and SIM per message, or let DroidBeam choose; it falls back to a SIM that has service.
+- **Incoming SMS** forwarded to the server and to your webhook, never lost while the phone is offline.
+- **Web dashboard** embedded in the server: device health, send form, searchable outgoing and incoming lists. Works on an offline LAN.
+- **Webhooks** for message status, incoming SMS, battery thresholds, charger and online/offline events, optionally HMAC-signed.
+- **LAN first, cloud fallback**: the phone talks to the server over the LAN and switches to your public domain when the LAN is unreachable.
+- **Built to stay up**: foreground service, boot receiver, watchdog and retry queues on the phone; one static binary with SQLite on the server.
+
+## How it works
 
 ```
 Your app ──REST──▶ Go server ◀──long-poll── Android phone (DroidBeam) ──SMS──▶ recipient
@@ -8,11 +36,30 @@ Your app ──REST──▶ Go server ◀──long-poll── Android phone (D
             webhook ◀┘   └── status / incoming SMS / battery / device info
 ```
 
-- `server/`: Go server with SQLite (single binary, no C dependencies).
-- `android/`: Kotlin + Jetpack Compose app (minSdk 26 / Android 8.0).
-- `scripts/get-lan-ip.sh`: look up the server's LAN address via its public domain.
+| Folder | What |
+|---|---|
+| `server/` | Go server with SQLite (single binary, no C dependencies) and the embedded dashboard |
+| `android/` | Kotlin + Jetpack Compose app (minSdk 26 / Android 8.0) |
+| `scripts/` | Release build and a helper to look up the server's LAN address via its public domain |
 
-**Downloads:** the Android APK and prebuilt server binaries (Linux, macOS, Windows) are on the [Releases](https://github.com/rayenking/DroidBeam/releases/latest) page.
+## Quick start
+
+```bash
+git clone https://github.com/rayenking/DroidBeam.git && cd DroidBeam
+cp .env.example .env          # set DROIDBEAM_API_KEY and DROIDBEAM_LAN_URL
+docker compose up -d
+```
+
+1. Open `http://<server>:8080/` and sign in with the API key.
+2. Install the APK from [Releases](https://github.com/rayenking/DroidBeam/releases/latest) on the phone, enter the server address and API key, and tap **Register device**.
+3. Send your first message:
+   ```bash
+   curl -X POST http://<server>:8080/api/v1/messages \
+     -H "X-API-Key: $KEY" -H "Content-Type: application/json" \
+     -d '{"to":"+15550100101","body":"Hello from DroidBeam"}'
+   ```
+
+**Contents:** [Running the server](#1-running-the-server) · [Android app](#2-installing-the-android-app) · [API](#3-api) · [Webhooks](#4-webhooks) · [Development](#5-development)
 
 ---
 
@@ -89,7 +136,7 @@ Open `http://<server>:8080/` in a browser and sign in with the API key. The dash
 - **Today's summary**: devices online, messages sent, messages failed, incoming SMS.
 - **Device cards**: online/offline, battery (level, charging, temperature), signal per SIM, route (LAN/cloud), IP and last seen.
 - **Send SMS form** with an SMS segment estimate and device/SIM selection.
-- **Outgoing messages** with a status filter, and **incoming SMS**.
+- **Outgoing messages** with a status filter, and **incoming SMS** as a compact list (click a row to read the whole message). Both lists scroll and have a search box (number/sender or text).
 - Auto-refresh every 5 seconds (paused while the tab is hidden).
 
 The API key is stored only in the browser (sessionStorage, or localStorage if "Remember on this browser" is checked). Do not open the dashboard over plain HTTP from the internet; use HTTPS for the public address.
@@ -191,11 +238,11 @@ curl -H "X-API-Key: $KEY" https://sms.example.com/api/v1/devices/1
   "created_at": "2026-11-18T11:27:21.845Z", "last_seen_at": "2026-11-18T11:30:02.112Z",
   "info": {
     "manufacturer": "Samsung", "model": "Galaxy A15", "android_version": "14", "sdk": 34,
-    "app_version": "0.1.0", "operator": "Telkomsel", "network": "wifi",
+    "app_version": "0.1.0", "operator": "Carrier One", "network": "wifi",
     "connection": "primary", "local_ip": "192.168.1.23",
     "sims": [
-      {"slot": 1, "carrier": "TELKOMSEL", "in_service": false, "default_sms": true},
-      {"slot": 2, "carrier": "XL", "in_service": true, "default_sms": false}
+      {"slot": 1, "carrier": "CARRIER ONE", "in_service": false, "default_sms": true},
+      {"slot": 2, "carrier": "CARRIER TWO", "in_service": true, "default_sms": false}
     ]
   },
   "battery": {
