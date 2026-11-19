@@ -355,3 +355,33 @@ func TestDashboardAndStats(t *testing.T) {
 		t.Fatalf("stats without key: %d", code)
 	}
 }
+
+func TestListSearch(t *testing.T) {
+	e := newTestEnv(t)
+	_, token := e.registerDevice("Pixel")
+	for _, m := range []map[string]string{
+		{"to": "+6281111", "body": "Halo Ryns"},
+		{"to": "+6282222", "body": "diskon 50%"},
+		{"to": "+6283333", "body": "lain"},
+	} {
+		e.do("POST", "/api/v1/messages", "key", m, nil)
+	}
+	for i, in := range []struct{ from, body string }{{"BANKXYZ", "Saldo: 6281"}, {"+628999", "Kode OTP"}} {
+		e.do("POST", "/api/v1/device/inbox", token, map[string]any{"uid": itoa(int64(i)), "from": in.from, "body": in.body, "received_at": time.Now().UnixMilli()}, nil)
+	}
+
+	var msgs struct{ Data []Message }
+	for q, want := range map[string]int{"ryns": 1, "6282222": 1, "50%25": 1, "%25": 1, "_": 0, "": 3} {
+		e.do("GET", "/api/v1/messages?q="+q, "key", nil, &msgs)
+		if len(msgs.Data) != want {
+			t.Errorf("messages q=%q: got %d, want %d", q, len(msgs.Data), want)
+		}
+	}
+	var inbox struct{ Data []InboxMessage }
+	for q, want := range map[string]int{"bankxyz": 1, "otp": 1, "saldo": 1, "zzz": 0} {
+		e.do("GET", "/api/v1/inbox?q="+q, "key", nil, &inbox)
+		if len(inbox.Data) != want {
+			t.Errorf("inbox q=%q: got %d, want %d", q, len(inbox.Data), want)
+		}
+	}
+}

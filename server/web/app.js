@@ -22,6 +22,9 @@
 
   let apiKey = store.get();
   let statusFilter = "";
+  let messagesSearch = "";
+  let inboxSearch = "";
+  let refreshSeq = 0;
   let timer = null;
   let devicesCache = [];
 
@@ -175,7 +178,8 @@
   function renderMessages(msgs) {
     const body = $("messages");
     if (!msgs.length) {
-      body.replaceChildren(h("tr", null, h("td", { colspan: "6", class: "empty", text: statusFilter ? "No messages with this status" : "No messages yet" })));
+      const text = messagesSearch ? "No matching messages" : statusFilter ? "No messages with this status" : "No messages yet";
+      body.replaceChildren(h("tr", null, h("td", { colspan: "6", class: "empty", text })));
       return;
     }
     body.replaceChildren(...msgs.map((m) => h("tr", null,
@@ -187,31 +191,58 @@
       h("td", { class: "mono muted nowrap", text: clock(m.created_at), title: m.created_at }))));
   }
 
+  // Inbox rows are collapsed to one line (sender + preview); a click shows the
+  // whole message. Expanded ids survive the periodic re-render.
+  const expandedInbox = new Set();
+
   function renderInbox(items) {
     const list = $("inbox");
     if (!items.length) {
-      list.replaceChildren(h("li", { class: "empty", text: "No incoming SMS yet" }));
+      list.replaceChildren(h("li", { class: "empty", text: inboxSearch ? "No matching SMS" : "No incoming SMS yet" }));
       return;
     }
     const names = Object.fromEntries(devicesCache.map((d) => [d.id, d.name]));
-    list.replaceChildren(...items.map((m) => h("li", null,
-      h("div", { class: "inbox-head" },
+    list.replaceChildren(...items.map((m) => {
+      const open = expandedInbox.has(m.id);
+      const row = h("button", { type: "button", class: "inbox-row", "aria-expanded": String(open) },
         h("span", { class: "inbox-from", text: m.from }),
-        h("span", { class: "mono muted", text: clock(m.received_at), title: m.received_at })),
-      h("div", { class: "inbox-body", text: m.body }),
-      h("div", { class: "mono muted", text: [names[m.device_id] || `Device #${m.device_id}`, m.sim ? `SIM ${m.sim}` : null].filter(Boolean).join(" · ") }))));
+        h("span", { class: "inbox-preview", text: m.body.replace(/\s+/g, " ") }),
+        h("span", { class: "mono muted inbox-time", text: clock(m.received_at), title: m.received_at }));
+      const detail = h("div", { class: "inbox-detail" },
+        h("div", { class: "inbox-body", text: m.body }),
+        h("div", { class: "mono muted", text: [names[m.device_id] || `Device #${m.device_id}`, m.sim ? `SIM ${m.sim}` : null, m.received_at].filter(Boolean).join(" · ") }));
+      detail.hidden = !open;
+      const li = h("li", { class: open ? "is-open" : null }, row, detail);
+      row.addEventListener("click", () => {
+        const now = !expandedInbox.has(m.id);
+        if (now) expandedInbox.add(m.id); else expandedInbox.delete(m.id);
+        row.setAttribute("aria-expanded", String(now));
+        li.classList.toggle("is-open", now);
+        detail.hidden = !now;
+      });
+      return li;
+    }));
+    // forget rows that scrolled out of the list
+    const shown = new Set(items.map((m) => m.id));
+    for (const id of expandedInbox) if (!shown.has(id)) expandedInbox.delete(id);
   }
 
   // ---- refresh loop ----
   async function refresh() {
     try {
-      const q = statusFilter ? `&status=${encodeURIComponent(statusFilter)}` : "";
+      const seq = ++refreshSeq;
+      const mq = new URLSearchParams({ limit: "100" });
+      if (statusFilter) mq.set("status", statusFilter);
+      if (messagesSearch) mq.set("q", messagesSearch);
+      const iq = new URLSearchParams({ limit: "100" });
+      if (inboxSearch) iq.set("q", inboxSearch);
       const [devices, msgs, inbox, stats] = await Promise.all([
         api("/api/v1/devices"),
-        api(`/api/v1/messages?limit=50${q}`),
-        api("/api/v1/inbox?limit=30"),
+        api(`/api/v1/messages?${mq}`),
+        api(`/api/v1/inbox?${iq}`),
         api("/api/v1/stats"),
       ]);
+      if (seq !== refreshSeq) return; // a newer refresh (e.g. new search text) already started
       devicesCache = devices.data;
       renderStats(stats, devices.data);
       renderDevices(devices.data);
@@ -285,6 +316,17 @@
     for (const c of $("status-filter").querySelectorAll(".chip")) c.classList.toggle("is-on", c === btn);
     refresh();
   });
+
+  // ---- search (server-side, debounced) ----
+  function onSearch(id, set) {
+    let t = null;
+    $(id).addEventListener("input", (ev) => {
+      clearTimeout(t);
+      t = setTimeout(() => { set(ev.target.value.trim()); refresh(); }, 300);
+    });
+  }
+  onSearch("messages-search", (v) => { messagesSearch = v; });
+  onSearch("inbox-search", (v) => { inboxSearch = v; });
 
   // ---- send form ----
   const bodyEl = $("send-body");

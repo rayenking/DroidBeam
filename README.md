@@ -172,8 +172,8 @@ Message status: `queued` → `sending` → `sent` → `delivered`, or `failed` (
 |---|---|---|
 | `POST` | `/api/v1/messages` | Send SMS (max 1600 characters, split into multipart automatically) |
 | `GET` | `/api/v1/messages/{id}` | Status of one message |
-| `GET` | `/api/v1/messages?status=&limit=&before=` | List messages (newest first) |
-| `GET` | `/api/v1/inbox?limit=&before=` | Incoming SMS |
+| `GET` | `/api/v1/messages?status=&q=&limit=&before=` | List messages (newest first); `q` searches recipient and text |
+| `GET` | `/api/v1/inbox?q=&limit=&before=` | Incoming SMS; `q` searches sender and text |
 | `GET` | `/api/v1/devices` | All phones, including info and battery |
 | `GET` | `/api/v1/devices/{id}` | One phone, including battery |
 | `POST` | `/api/v1/devices` | Register a phone (normally done by the app) |

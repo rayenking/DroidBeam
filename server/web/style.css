@@ -125,7 +125,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 /* ---------- layout ---------- */
 .wrap { padding: 24px clamp(16px, 3vw, 32px) 48px; max-width: 1440px; margin: 0 auto; display: grid; gap: 20px; }
 .grid-top { display: grid; gap: 20px; grid-template-columns: minmax(0, 1fr) 380px; align-items: start; }
-.grid-bottom { display: grid; gap: 20px; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); align-items: start; }
+.grid-bottom { display: grid; gap: 20px; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); align-items: stretch; }
 @media (max-width: 1080px) { .grid-top, .grid-bottom { grid-template-columns: minmax(0, 1fr); } }
 
 .panel {
@@ -134,6 +134,12 @@ button, input, select, textarea { font: inherit; color: inherit; }
   animation: rise .5s ease both;
 }
 .panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+/* Outgoing / incoming lists: same fixed height side by side, the list scrolls inside. */
+.panel-list { display: flex; flex-direction: column; height: clamp(420px, 72vh, 820px); }
+.panel-list .scroll { flex: 1; min-height: 0; overflow: auto; }
+.panel-list .panel-head { min-height: 32px; } /* keep both search boxes on one line */
+.panel-list .table thead th { position: sticky; top: 0; z-index: 1; background: var(--panel); padding-top: 2px; }
+input.search { font-size: 14px; padding: 8px 12px; margin-bottom: 12px; flex: none; }
 .count { font: 12px var(--font-mono); color: var(--ink-3); }
 
 /* ---------- stats ---------- */
@@ -228,6 +234,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--signal); box-sha
 
 /* ---------- tables / lists ---------- */
 .table-wrap { overflow-x: auto; margin: 0 -18px; padding: 0 18px; }
+.panel-list .table-wrap { overflow: auto; }
 .table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 .table th { text-align: left; font: 600 11px var(--font-display); letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); padding: 0 10px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
 .table td { padding: 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
@@ -240,11 +247,22 @@ input:focus, select:focus, textarea:focus { border-color: var(--signal); box-sha
 .nowrap { white-space: nowrap; }
 
 .inbox { list-style: none; margin: 0; padding: 0; display: grid; }
-.inbox li { padding: 12px 2px; border-bottom: 1px solid var(--line); display: grid; gap: 4px; animation: fade .3s ease both; }
+.inbox li { border-bottom: 1px solid var(--line); }
 .inbox li:last-child { border-bottom: 0; }
-.inbox-head { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
-.inbox-from { font: 600 13px var(--font-mono); }
+.inbox-row {
+  all: unset; box-sizing: border-box; width: 100%; cursor: pointer;
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: baseline;
+  padding: 10px 2px;
+}
+.inbox-row:hover .inbox-preview { color: var(--ink); }
+.inbox-row:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; border-radius: 4px; }
+.inbox-from { font: 600 13px var(--font-mono); white-space: nowrap; }
+.inbox-preview { color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.inbox-time { white-space: nowrap; }
+.inbox li.is-open .inbox-preview { visibility: hidden; }
+.inbox-detail { display: grid; gap: 6px; padding: 0 2px 12px; }
 .inbox-body { overflow-wrap: anywhere; white-space: pre-wrap; }
+[hidden] { display: none !important; }
 .empty { color: var(--ink-3); font-size: 14px; padding: 18px 0; text-align: center; }
 
 /* ---------- motion ---------- */

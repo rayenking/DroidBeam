@@ -390,12 +390,19 @@ func (s *Store) GetMessage(ctx context.Context, id int64) (*Message, error) {
 }
 
 // ListMessages returns newest first. beforeID = 0 means no cursor.
-func (s *Store) ListMessages(ctx context.Context, status string, beforeID int64, limit int) ([]Message, error) {
+// ListMessages lists outgoing messages, newest first. search matches the
+// recipient or the body (case-insensitive substring).
+func (s *Store) ListMessages(ctx context.Context, status, search string, beforeID int64, limit int) ([]Message, error) {
 	q := `SELECT ` + messageCols + ` FROM messages WHERE 1=1`
 	args := []any{}
 	if status != "" {
 		q += ` AND status = ?`
 		args = append(args, status)
+	}
+	if search != "" {
+		p := likePattern(search)
+		q += ` AND (recipient LIKE ? ESCAPE '\' OR body LIKE ? ESCAPE '\')`
+		args = append(args, p, p)
 	}
 	if beforeID > 0 {
 		q += ` AND id < ?`
@@ -522,11 +529,18 @@ func scanInbox(sc scanner) (*InboxMessage, error) {
 	return &m, nil
 }
 
-func (s *Store) ListInbox(ctx context.Context, beforeID int64, limit int) ([]InboxMessage, error) {
-	q := `SELECT id, device_id, sender, body, received_at, created_at, sim FROM inbox`
+// ListInbox lists incoming SMS, newest first. search matches the sender or
+// the body (case-insensitive substring).
+func (s *Store) ListInbox(ctx context.Context, search string, beforeID int64, limit int) ([]InboxMessage, error) {
+	q := `SELECT id, device_id, sender, body, received_at, created_at, sim FROM inbox WHERE 1=1`
 	args := []any{}
+	if search != "" {
+		p := likePattern(search)
+		q += ` AND (sender LIKE ? ESCAPE '\' OR body LIKE ? ESCAPE '\')`
+		args = append(args, p, p)
+	}
 	if beforeID > 0 {
-		q += ` WHERE id < ?`
+		q += ` AND id < ?`
 		args = append(args, beforeID)
 	}
 	q += ` ORDER BY id DESC LIMIT ?`
@@ -545,4 +559,11 @@ func (s *Store) ListInbox(ctx context.Context, beforeID int64, limit int) ([]Inb
 		out = append(out, *m)
 	}
 	return out, rows.Err()
+}
+
+// likePattern turns user text into a LIKE "contains" pattern, escaping the
+// wildcards so "%" and "_" match literally.
+func likePattern(s string) string {
+	r := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
+	return "%" + r.Replace(s) + "%"
 }

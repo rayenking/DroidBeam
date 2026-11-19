@@ -187,7 +187,7 @@ func (s *Server) handleListMessages(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	msgs, err := s.store.ListMessages(r.Context(), status, before, limit)
+	msgs, err := s.store.ListMessages(r.Context(), status, searchParam(r), before, limit)
 	if err != nil {
 		internalError(w, err)
 		return
@@ -200,7 +200,7 @@ func (s *Server) handleListInbox(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	msgs, err := s.store.ListInbox(r.Context(), before, limit)
+	msgs, err := s.store.ListInbox(r.Context(), searchParam(r), before, limit)
 	if err != nil {
 		internalError(w, err)
 		return
@@ -473,6 +473,15 @@ func validPhone(s string) bool {
 		}
 	}
 	return true
+}
+
+// searchParam is the optional "q" filter of list endpoints (max 100 chars).
+func searchParam(r *http.Request) string {
+	q := strings.TrimSpace(r.URL.Query().Get("q"))
+	if len([]rune(q)) > 100 {
+		q = string([]rune(q)[:100])
+	}
+	return q
 }
 
 func pageParams(w http.ResponseWriter, r *http.Request) (limit int, before int64, ok bool) {

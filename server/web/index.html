@@ -70,7 +70,7 @@
       </div>
 
       <div class="grid-bottom">
-        <section class="panel" aria-labelledby="h-messages">
+        <section class="panel panel-list" aria-labelledby="h-messages">
           <div class="panel-head">
             <h2 id="h-messages">Outgoing messages</h2>
             <div class="chips" id="status-filter" role="group" aria-label="Status filter">
@@ -82,7 +82,8 @@
               <button type="button" class="chip" data-status="failed">Failed</button>
             </div>
           </div>
-          <div class="table-wrap">
+          <input type="search" id="messages-search" class="search" placeholder="Search number or text…" aria-label="Search outgoing messages" autocomplete="off">
+          <div class="table-wrap scroll">
             <table class="table">
               <thead><tr><th>#</th><th>To</th><th>Message</th><th>Status</th><th>SIM</th><th>Time</th></tr></thead>
               <tbody id="messages"></tbody>
@@ -90,9 +91,10 @@
           </div>
         </section>
 
-        <section class="panel" aria-labelledby="h-inbox">
+        <section class="panel panel-list" aria-labelledby="h-inbox">
           <div class="panel-head"><h2 id="h-inbox">Incoming SMS</h2></div>
-          <ul id="inbox" class="inbox"></ul>
+          <input type="search" id="inbox-search" class="search" placeholder="Search sender or text…" aria-label="Search incoming SMS" autocomplete="off">
+          <div class="scroll"><ul id="inbox" class="inbox"></ul></div>
         </section>
       </div>
     </main>
