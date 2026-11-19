@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="docs/logo.png" alt="DroidBeam logo" width="112">
+
 # DroidBeam
 
 **Turn any Android phone into a self-hosted SMS gateway.**
